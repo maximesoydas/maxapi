@@ -5,16 +5,6 @@ from django.contrib.auth.models import User
 from django.test import tag
 
 
-class User(models.Model):
-    first_name = models.CharField(max_length=200)
-    last_name = models.CharField(max_length=200)
-    email = models.EmailField(max_length=200)
-    password = models.CharField(max_length=200)
-    def __str__(self):
-        return self.first_name +' '+self.last_name
-
-
-
 class Project(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE)
     description = models.CharField(max_length=500)
@@ -22,7 +12,7 @@ class Project(models.Model):
     type = models.CharField(max_length=200)
 
     def __str__(self):
-        return self.title + 'by' + self.author
+        return self.title + 'by' + self.author.first_name
 
 
 class Contributor(models.Model):
@@ -55,8 +45,8 @@ class Issue(models.Model):
         return self.name
 
 class Comment(models.Model):
-    description = models.CharField(max_length=500)
     author = models.ForeignKey(User, on_delete=models.CASCADE)
+    description = models.CharField(max_length=500)
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE)
     created_time =  models.DateTimeField(auto_now_add=True)
 

@@ -1,7 +1,19 @@
-# from rest_framework import serializers
-# from .models import Drink
+from rest_framework import serializers
+from .models import Project, Issue, Comment,Contributor
 
-# class DrinkSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Drink
-#         fields = ['id','name','description']
+class ProjectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        fields = ['id','author','description', 'title', 'type']
+class ContributorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Contributor
+        fields = ['id','contributor','permission', 'role']
+class IssueSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Issue
+        fields = ['id','title','description', 'tag', 'priority','project','status','author','created_time','assignee','name','description']
+class CommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ['id','author','description', 'issue', 'created_time']
