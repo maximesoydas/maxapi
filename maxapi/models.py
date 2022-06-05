@@ -1,8 +1,9 @@
 from telnetlib import STATUS
 from turtle import title
 from django.db import models
-from django.contrib.auth.models import User
+import django
 from django.test import tag
+from accounts.models import User
 
 
 class Project(models.Model):
