@@ -7,17 +7,22 @@ from accounts.models import User
 
 
 class Project(models.Model):
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    author = models.ForeignKey(User, on_delete=models.CASCADE, db_constraint=False)
     description = models.CharField(max_length=500)
     title = models.CharField(max_length=200)
     type = models.CharField(max_length=200)
 
     def __str__(self):
         return self.title + 'by' + self.author.first_name
+    
+    @property
+    def get_author(self):
+        return "122"
+        
 
 
 class Contributor(models.Model):
-    contributor = models.ForeignKey(User, on_delete=models.CASCADE)
+    contributor = models.ForeignKey(User, on_delete=models.CASCADE, db_constraint=False)
     permission_choice = (
         (1, ("allowed")),
         (2, ("not allowed")),
@@ -36,8 +41,8 @@ class Issue(models.Model):
     priority = models.CharField(max_length=200)
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
     status = models.CharField(max_length=200)
-    author = models.ForeignKey(User,  related_name='author', on_delete=models.CASCADE)
-    assignee = models.ForeignKey(User, related_name='assignee', on_delete=models.CASCADE)
+    author = models.ForeignKey(User,  related_name='author', on_delete=models.CASCADE, db_constraint=False)
+    assignee = models.ForeignKey(User, related_name='assignee', on_delete=models.CASCADE, db_constraint=False)
     created_time =  models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=200)
     description = models.CharField(max_length=500)
@@ -46,9 +51,9 @@ class Issue(models.Model):
         return self.name
 
 class Comment(models.Model):
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    author = models.ForeignKey(User, on_delete=models.CASCADE, db_constraint=False)
     description = models.CharField(max_length=500)
-    issue = models.ForeignKey(Issue, on_delete=models.CASCADE)
+    issue = models.ForeignKey(Issue, on_delete=models.CASCADE, db_constraint=False)
     created_time =  models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
