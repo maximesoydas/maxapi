@@ -6,17 +6,14 @@ from accounts.serializers import UserDetailSerializer
 class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
-        fields = ['id',
-                  'description',
-                #   'author',
-                  'title',
-                  'type'
-                  ]
-
+        fields = ['id','description','title','type']
+        read_field_only = ['author']
 class ContributorSerializer(serializers.ModelSerializer):
+    # contributor = serializers.RelatedField(source='email', read_only=True)
     class Meta:
         model = Contributor
-        fields = ['id','contributor','permission', 'role']
+        fields = ['contributor','permission', 'role', 'project']
+        read_field_only = ['project']
 class IssueSerializer(serializers.ModelSerializer):
     class Meta:
         model = Issue
@@ -25,3 +22,4 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ['id','author','description', 'issue', 'created_time']
+

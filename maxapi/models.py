@@ -7,13 +7,13 @@ from accounts.models import User
 
 
 class Project(models.Model):
-    author = models.ForeignKey(User, on_delete=models.CASCADE, db_constraint=False)
+    author = models.ForeignKey(to=User, on_delete=models.CASCADE, db_constraint=False)
     description = models.CharField(max_length=500)
     title = models.CharField(max_length=200)
     type = models.CharField(max_length=200)
 
     def __str__(self):
-        return self.title + 'by' + self.author.first_name
+        return self.title + ' by ' + self.author.email
     
     @property
     def get_author(self):
@@ -22,16 +22,17 @@ class Project(models.Model):
 
 
 class Contributor(models.Model):
-    contributor = models.ForeignKey(User, on_delete=models.CASCADE, db_constraint=False)
+    contributor = models.ForeignKey(to=User, on_delete=models.CASCADE, db_constraint=False)
     permission_choice = (
         (1, ("allowed")),
         (2, ("not allowed")),
     )
     permission = models.IntegerField(choices=permission_choice)
     role = models.CharField(max_length=200)
+    project = models.ForeignKey(to = Project,default=None, on_delete=models.CASCADE, db_constraint=False,related_name='contributor')
 
     def __str__(self):
-        return self.contributor + ' ' + self.role
+        return str(self.contributor) + ' ' + self.role
 
 
 class Issue(models.Model):
