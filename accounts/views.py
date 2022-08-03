@@ -1,3 +1,4 @@
+from ast import Return
 from xml.etree.ElementTree import XML
 from requests import request
 from django.http import Http404
@@ -5,10 +6,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import APIException, AuthenticationFailed
 from rest_framework.authentication import get_authorization_header
+
 from maxapi.models import Project, Contributor, Comment, Issue
 from rest_framework import authentication, generics, mixins, permissions, status
 from .serializers import UserSerializer
 from .models import User
+from rest_framework import serializers
 from maxapi.serializers import ProjectSerializer, ContributorSerializer, IssueSerializer, CommentSerializer
 from rest_framework.permissions import IsAuthenticated
 from .permissions import IsAdminAuthenticated
@@ -58,19 +61,29 @@ class ProjectListCreateAPIView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
-        serializer.save()
+        # serializer.validated_data['author'] = self.request.user
         project = serializer.save()
         contributor = Contributor.objects.create(contributor=self.request.user,permission=1,project=project, role='author')
         contributor.save()
+        return super(ProjectListCreateAPIView, self).perform_create(serializer)
 
         # return super().perform_create(serializer)
     def list(self, request):
         queryset = Project.objects.filter(contributor__contributor=self.request.user.id).order_by('id')
         serializer = ProjectSerializer(queryset, many=True)   
+        for project_data in serializer.data:
+            print("PROJECT DATA")
+            # print(project_data['id'])
+            proj = Project.objects.filter(id=project_data['id']).order_by('id')
+            # print(proj['author'])
+            for p in proj:
+                author = p.author
+            project_data['author'] = str(author)
+  
         if serializer.data == []:
             return Response('There is no projects related to the current user') 
         return Response(serializer.data)
+
 
 project_list_create_view = ProjectListCreateAPIView.as_view()
 
@@ -138,7 +151,7 @@ class ContributorListCreateAPIView(generics.ListCreateAPIView):
     queryset= Contributor.objects.all()
     serializer_class = ContributorSerializer
     permission_classes = [permissions.IsAuthenticated]
-    
+
     
     def perform_create(self, serializer):
         pk = self.kwargs['pk']
@@ -151,8 +164,8 @@ class ContributorListCreateAPIView(generics.ListCreateAPIView):
         # pour mettre un contributor il nous faut etre author
         for contributor in Contributor.objects.filter(project= pk):
             print(str(contributor.contributor.id))
-            print(str(serializer.data['contributor']))
-            if str(contributor.contributor.id) == str(serializer.data['contributor']):
+            print(str(serializer.validated_data['contributor']))
+            if str(contributor.contributor.id) == str(serializer.validated_data['contributor']):
                 raise ValidationError('Current user is already a contributor')
          
         if project_id.author == self.request.user:
@@ -210,8 +223,9 @@ class ContributorDetailAPIView(APIView):
         print(project_id)
         for contributor in Contributor.objects.filter(project_id=project_id).order_by('id'):
             print(contributor.contributor.id)
+            
             if contributor.contributor.id == user_id:
-                # Maybe verify if user is the author of project? maybe dont remove author from contributors
+                # Maybe verify if the user is the author of project? maybe dont remove author from contributors
                 contributor.delete()
                 return Response(f"Contributor {contributor.contributor} removed from project")
             else:
@@ -233,3 +247,147 @@ class DeleteUser(APIView):
         return Response({"result":"user delete"})
 
 user_delete_view = DeleteUser.as_view()
+
+
+
+
+# api/projects/id/users/
+class IssueListCreateAPIView(generics.ListCreateAPIView):
+    queryset= Issue.objects.all()
+    serializer_class = IssueSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    project = None
+    
+    def perform_create(self, serializer):
+        pk = self.kwargs['pk']
+        project_id = Project.objects.get(id=pk)
+        
+        print(serializer.validated_data['assignee'])
+        contriblist=[]
+        # if assignee is not in contributor return error
+        for contributor in Contributor.objects.filter(project_id=project_id).order_by('id'):
+            print(contributor.contributor)
+            # print(serializer.data)
+            contriblist.append(str(contributor.contributor.email))
+        print("CONTRIBLIST")
+        print(contriblist)
+        print(serializer.validated_data['assignee'])
+        if str(serializer.validated_data['assignee']) not in contriblist:
+            print('xzx')
+            raise ValidationError("Please set the assignee as a contributor before assigning issues")
+        serializer.validated_data['project']= project_id
+        serializer.validated_data['author'] = self.request.user
+        print(serializer.validated_data)
+        serializer.save()
+        
+
+     
+
+
+    def list(self, request, pk):
+        print(self.kwargs['pk'])
+        project = Project.objects.get(id=pk)
+        # print(self.request.user.email)
+        
+        queryset = Issue.objects.filter(project_id=pk).order_by('id')
+        if project in Project.objects.filter(contributor__contributor=self.request.user):
+            serializer = IssueSerializer(queryset, many=True)
+            # print(serializer.data['project'])
+            
+            return Response(serializer.data)
+        else:
+            return Response("User is not a contributor of this project")
+issue_list_create_view = IssueListCreateAPIView.as_view()
+
+
+
+
+
+
+
+class IssueDetailAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    # queryset= Project.objects.all()
+    # print(queryset)
+    serializer_class = IssueSerializer
+    def get_object(self, pk):
+        try:
+            return Issue.objects.get(pk=pk)
+        except Issue.DoesNotExist:
+            raise Http404
+    """
+    Retrieve, update or delete an issue.
+    """
+    # def put(self, request, *args, **kwargs):
+    #     print(request.data)
+    #     pk = self.kwargs['pk_alt']
+    #     issue = self.get_object(pk)
+    #     serializer = IssueSerializer(issue, data=request.data)
+    #     if self.request.user ==  issue.author:
+    #         serializer =
+          
+    def put(self, *args, **kwargs):
+        pk = self.kwargs['pk_alt']
+        issue=Issue.objects.get(pk=pk)
+        print(issue)
+        data = self.request.data
+        
+        issue.title = data["title"]
+        issue.tag = data["tag"]
+        issue.priority = data["priority"]
+        issue.status = data["status"]
+        issue.assignee = User.objects.get(pk=data["assignee"])
+        issue.name = data["name"]
+        issue.description = data["description"]
+        if issue.author == self.request.user:
+            issue.save()
+            serializer = IssueSerializer(issue)
+            return Response(serializer.data)
+        else:
+            return Response("User is not the author of this issue")
+    #     if issue.author == self.request.user:
+    #         issue = self.request.data
+    #         serializer.save()
+    #         return Response(serializer.data)
+    #     else:
+    #         return Response(status.HTTP_404_NOT_FOUND)
+
+
+    # # def put(self, request, pk, format=None):
+    # #     project = self.get_object(pk)
+    #     serializer = ProjectSerializer(project, data=request.data)
+    #     if project.author == self.request.user:
+    #         if serializer.is_valid():
+    #             serializer.save()
+    #             return Response(serializer.data)
+    #         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    #     else:
+    #         return Response(status.HTTP_404_NOT_FOUND)
+
+
+    def delete(self, request, format=None,*args, **kwargs):
+
+        obj_id = self.kwargs['pk_alt']
+
+        project_id = self.kwargs['pk']
+        contriblist = []
+
+        for issue in Issue.objects.filter(pk=obj_id).order_by('pk'):
+            print(issue.author.id)
+            if issue.author.id == self.request.user.id:
+                # Maybe verify if the user is the author of project? maybe dont remove author from contributors
+                issue.delete()
+                return Response(f"Issue {issue} removed from project")
+            for contributor in Contributor.objects.filter(project_id=project_id).order_by('id'):
+                print(contributor.contributor.id)
+                print(self.request.user.id)
+                if str(self.request.user.id) == str(contributor.contributor.id):
+                    print(contributor.permission)
+                    if contributor.permission == 1:
+                        
+                        issue.delete()
+                        return Response(f"Issue {issue} removed from project by contributor {contributor.contributor} with permission")
+            else:
+                return Response("Current user cannot remove the issue (missing rights)")      
+        return Response("Wrong issue id (incomplete or inexistent)")           
+issue_detail_view = IssueDetailAPIView.as_view()
