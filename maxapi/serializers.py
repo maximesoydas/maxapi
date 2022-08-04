@@ -24,6 +24,8 @@ class IssueSerializer(serializers.ModelSerializer):
         fields = ['id','title','description', 'tag','project','author', 'priority','status','created_time','assignee','name','description']
         read_field_only = ['project', 'author']
 class CommentSerializer(serializers.ModelSerializer):
+    author = serializers.CharField(default=serializers.CurrentUserDefault())
+    issue = serializers.CharField(default='')
     class Meta:
         model = Comment
         fields = ['id','author','description', 'issue', 'created_time']
