@@ -1,23 +1,14 @@
-from ast import Return
-from xml.etree.ElementTree import XML
-from requests import request
 from django.http import Http404
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.exceptions import APIException, AuthenticationFailed
-from rest_framework.authentication import get_authorization_header
-
+from rest_framework.exceptions import APIException
 from maxapi.models import Project, Contributor, Comment, Issue
-from rest_framework import authentication, generics, mixins, permissions, status
+from rest_framework import generics, permissions, status
 from .serializers import UserSerializer
 from .models import User
-from rest_framework import serializers
 from maxapi.serializers import ProjectSerializer, ContributorSerializer, IssueSerializer, CommentSerializer
-from rest_framework.permissions import IsAuthenticated
 from .permissions import IsAdminAuthenticated
-from rest_framework_simplejwt.tokens import RefreshToken, SlidingToken, UntypedToken
-# from django.contrib.auth.models import User
-
+from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from django.core.exceptions import ValidationError
 
 #api/regitser
@@ -46,7 +37,8 @@ class LoginAPIView(APIView):
             raise APIException('Invalid Credentials')
         tokens['user_email'] = user.email
         tokens['user_name'] = f"{user.first_name} {user.last_name}"
-        tokens['user_access_jwt_token'] = str(RefreshToken.for_user(user).access_token)
+        tokens['user_access_jwt_token'] = str(AccessToken.for_user(user))
+        tokens['user_refresh_jwt_token'] = str(RefreshToken.for_user(user).access_token)
         tokens['user_id'] = user.id
         response = Response(tokens)
         return response
@@ -81,7 +73,7 @@ class ProjectListCreateAPIView(generics.ListCreateAPIView):
 
 project_list_create_view = ProjectListCreateAPIView.as_view()
 
-# # api/projects/id/
+# api/projects/id/
 class ProjectDetailAPIView(APIView):
     """
     Retrieve, update or delete a Project ID.
@@ -98,24 +90,30 @@ class ProjectDetailAPIView(APIView):
     def get(self, request, pk, format=None):
         contrib_obj = Contributor.objects.all()
         serialize_contributor = ContributorSerializer(contrib_obj)
-        project = self.get_object(pk)
+        project = Project.objects.get(id=pk)
         serializer = ProjectSerializer(project)
-
+        contriblist = []
+        for contributor in Contributor.objects.filter(project_id=pk).order_by('id'):
+            contriblist.append(str(contributor.contributor.email))
         if project.author == self.request.user:
+            return Response(serializer.data)
+        if self.request.user.email in contriblist:
             return Response(serializer.data)
         else:
             return Response(status.HTTP_404_NOT_FOUND)
 
     def put(self, request, pk, format=None):
-        project = self.get_object(pk)
-        serializer = ProjectSerializer(project, data=request.data)
+        project = Project.objects.get(pk=pk)
+        data = self.request.data
+        project.description = data["description"]
+        project.title = data["title"]
+        project.type = data["type"]
         if project.author == self.request.user:
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            project.save()
+            serializer = ProjectSerializer(project)
+            return Response(serializer.data)
         else:
-            return Response(status.HTTP_404_NOT_FOUND)
+            return Response("User is not the author of this Project")
 
     def delete(self, request, pk, format=None):
         project = self.get_object(pk)
@@ -155,7 +153,7 @@ class ContributorListCreateAPIView(generics.ListCreateAPIView):
                 projid= Project.objects.get(id=data['project'])
                 data['project'] = projid.title
                 userid= User.objects.get(id=data['contributor'])
-                data['contributor'] = userid.email
+                data['contributor'] = userid.id
                 
             return Response(serializer.data)
         else:
@@ -164,7 +162,7 @@ contributor_list_create_view = ContributorListCreateAPIView.as_view()
 
 
 
-
+# api/projects/id/users/id/
 class ContributorDetailAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ContributorSerializer
@@ -174,21 +172,31 @@ class ContributorDetailAPIView(APIView):
     def delete(self, request, format=None,*args, **kwargs):
         user_id = self.kwargs['pk_alt']
         project_id = self.kwargs['pk']
+        project = Project.objects.get(pk=project_id)
+        contriblist = []
         for contributor in Contributor.objects.filter(project_id=project_id).order_by('id'):
-
-            if contributor.contributor.id == user_id:
-                # Maybe verify if the user is the author of project? maybe dont remove author from contributors
+            contriblist.append(contributor.contributor.id)
+        if user_id == project.author.id:
+            # Maybe verify if the user is the author of project dont remove author from contributors
+            raise ValidationError("Project author cannot be removed from contributors") 
+        if user_id in contriblist:
+            if self.request.user.id == user_id:
+                contributor.delete()
+                return Response(f"Contributor {contributor.contributor} removed from project")
+            elif self.request.user.id == project.author.id:
                 contributor.delete()
                 return Response(f"Contributor {contributor.contributor} removed from project")
             else:
-                return Response("Specifed user is not a contributor of this project")            
+                return Response(f"User is neither the project owner nor the specified contributor ")
+        else:
+            return Response("Specifed user is not a contributor of this project")            
 contributor_detail_view = ContributorDetailAPIView.as_view()
 
 
 # api/delete/user
 class DeleteUser(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminAuthenticated]
-
+    # delete own account
     def delete(self, request, *args, **kwargs):
         user=self.request.user
         user.delete()
