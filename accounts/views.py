@@ -10,7 +10,7 @@ from maxapi.serializers import ProjectSerializer, ContributorSerializer, IssueSe
 from .permissions import IsAdminAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from django.core.exceptions import ValidationError
-
+from rest_framework.exceptions import NotFound
 #api/regitser
 class RegisterAPIView(APIView):
     authentication_classes = [] #disables authentication
@@ -58,6 +58,7 @@ class ProjectListCreateAPIView(generics.ListCreateAPIView):
         return super(ProjectListCreateAPIView, self).perform_create(serializer)
 
     def list(self, request):
+        # try:
         queryset = Project.objects.filter(contributor__contributor=self.request.user.id).order_by('id')
         serializer = ProjectSerializer(queryset, many=True)   
         for project_data in serializer.data:
@@ -65,10 +66,11 @@ class ProjectListCreateAPIView(generics.ListCreateAPIView):
             for p in proj:
                 author = p.author
             project_data['author'] = str(author)
-  
+
         if serializer.data == []:
             return Response('There is no projects related to the current user') 
         return Response(serializer.data)
+    
 
 
 project_list_create_view = ProjectListCreateAPIView.as_view()
@@ -88,19 +90,23 @@ class ProjectDetailAPIView(APIView):
             raise Http404
 
     def get(self, request, pk, format=None):
-        contrib_obj = Contributor.objects.all()
-        serialize_contributor = ContributorSerializer(contrib_obj)
-        project = Project.objects.get(id=pk)
-        serializer = ProjectSerializer(project)
-        contriblist = []
-        for contributor in Contributor.objects.filter(project_id=pk).order_by('id'):
-            contriblist.append(str(contributor.contributor.email))
-        if project.author == self.request.user:
-            return Response(serializer.data)
-        if self.request.user.email in contriblist:
-            return Response(serializer.data)
-        else:
-            return Response(status.HTTP_404_NOT_FOUND)
+        try:
+            contrib_obj = Contributor.objects.all()
+            serialize_contributor = ContributorSerializer(contrib_obj)
+            project = Project.objects.get(id=pk)
+            serializer = ProjectSerializer(project)
+            contriblist = []
+            for contributor in Contributor.objects.filter(project_id=pk).order_by('id'):
+                contriblist.append(str(contributor.contributor.email))
+            if project.author == self.request.user:
+                return Response(serializer.data)
+            if self.request.user.email in contriblist:
+                return Response(serializer.data)
+            else:
+                return Response(data={f"User is not a contributor of this project"})
+        except Project.DoesNotExist:
+            return Response(data={f"Project {pk} was not found"})
+
 
     def put(self, request, pk, format=None):
         project = Project.objects.get(pk=pk)
@@ -319,8 +325,14 @@ class CommentListCreateAPIView(generics.ListCreateAPIView):
     def perform_create(self, serializer, *args, **kwargs):
         project_pk = self.kwargs['pk']
         issue_pk = self.kwargs['pk_alt']
-        project_id = Project.objects.get(id=project_pk)
-        issue_id = Issue.objects.get(id=issue_pk)
+        try:
+            project_id = Project.objects.get(id=project_pk)
+        except Project.DoesNotExist:
+            raise NotFound({f"Project {project_pk}": "Not Found"})
+        try:
+            issue_id = Issue.objects.get(id=issue_pk)
+        except Issue.DoesNotExist:
+            raise NotFound({f"Issue {issue_pk}": "Not Found"})
         
         contriblist=[]
         # if assignee is not in contributor return error
@@ -333,6 +345,7 @@ class CommentListCreateAPIView(generics.ListCreateAPIView):
         serializer.validated_data['issue']= issue_id
         serializer.validated_data['author'] = self.request.user
         serializer.save()
+        
 
 
     def list(self, request, pk, *args, **kwargs):
@@ -364,10 +377,19 @@ class CommentDetailAPIView(APIView):
         project_pk = self.kwargs['pk_project']
         issue_pk = self.kwargs['pk_issue']
         comment_pk = self.kwargs['pk_comment']
+        try:
+            project = Project.objects.get(pk=project_pk)
+        except Project.DoesNotExist:
+            raise NotFound({f"Project {project_pk}": "Not Found"})
+        try:
+            issue = Issue.objects.get(pk=issue_pk)
+        except Issue.DoesNotExist:
+            raise NotFound({f"Issue {issue_pk}": "Not Found"})
+        try:
+            comment = Comment.objects.get(pk=comment_pk)
+        except Comment.DoesNotExist:
+            raise NotFound({f"Comment {comment_pk}": "Not Found"})
         
-        project = Project.objects.get(pk=project_pk)
-        issue = Issue.objects.get(pk=issue_pk)
-        comment = Comment.objects.get(pk=comment_pk)
         contriblist = []
         for contributor in Contributor.objects.filter(project_id=project).order_by('id'):
             contriblist.append(str(contributor.contributor.email))
@@ -380,10 +402,24 @@ class CommentDetailAPIView(APIView):
 
     
     def put(self, *args, **kwargs):
-        comment_pk = self.kwargs['pk_comment']
-        comment=Comment.objects.get(pk=comment_pk)
         data = self.request.data
+        project_pk = self.kwargs['pk_project']
+        issue_pk = self.kwargs['pk_issue']
+        comment_pk = self.kwargs['pk_comment']
 
+        
+        try:
+            project = Project.objects.get(pk=project_pk)
+        except Project.DoesNotExist:
+            raise NotFound({f"Project {project_pk}": "Not Found"})
+        try:
+            issue = Issue.objects.get(pk=issue_pk)
+        except Issue.DoesNotExist:
+            raise NotFound({f"Issue {issue_pk}": "Not Found"})
+        try:
+            comment = Comment.objects.get(pk=comment_pk)
+        except Comment.DoesNotExist:
+            raise NotFound({f"Comment {comment_pk}": "Not Found"})
         comment.description = data["description"]
         if comment.author == self.request.user:
             comment.save()
