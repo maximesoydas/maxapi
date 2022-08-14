@@ -303,7 +303,7 @@ class IssueDetailAPIView(APIView):
             contriblist.append(str(contributor.contributor.email))
             if str(contributor.contributor.id) == str(self.request.user.id):
                 if str(contributor.permission) == "2":
-                    raise NotFound("Contributor has permission level 2 therefore he is not allowed to create issues on this project")
+                    raise NotFound("Contributor has permission level 2 therefore he is not allowed to modify issues on this project")
 
         print(issue)
         data = self.request.data
