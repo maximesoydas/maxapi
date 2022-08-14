@@ -248,9 +248,9 @@ class IssueListCreateAPIView(generics.ListCreateAPIView):
         # if assignee is not in contributor return error
         for contributor in Contributor.objects.filter(project_id=project_id).order_by('id'):
             contriblist.append(str(contributor.contributor.email))
-            if contributor == self.request.user.email:
-                if contributor.permission == 2:
-                    return Response("Contributor has permission level 2 therefore he is not allowed to create issues on this project")
+            if str(contributor.contributor.id) == str(self.request.user.id):
+                if str(contributor.permission) == "2":
+                    raise NotFound("Contributor has permission level 2 therefore he is not allowed to create issues on this project")
 
         if str(self.request.user.email) not in contriblist:
             raise NotFound({"User":"Not a contributor of this project"})
@@ -294,11 +294,17 @@ class IssueDetailAPIView(APIView):
           
     def put(self, *args, **kwargs):
         pk = self.kwargs['pk_alt']
-    
+        contriblist = []
         try:
             issue = Issue.objects.get(id=pk)
         except Issue.DoesNotExist:
             raise NotFound({f"Issue {pk}": "Not Found"})
+        for contributor in Contributor.objects.filter(project_id=self.kwargs['pk_alt']).order_by('id'):
+            contriblist.append(str(contributor.contributor.email))
+            if str(contributor.contributor.id) == str(self.request.user.id):
+                if str(contributor.permission) == "2":
+                    raise NotFound("Contributor has permission level 2 therefore he is not allowed to create issues on this project")
+
         print(issue)
         data = self.request.data
         
@@ -340,7 +346,7 @@ class IssueDetailAPIView(APIView):
                         issue.delete()
                         return Response(f"Issue {obj_id} : {issue} removed from project by contributor {contributor.contributor} with permission ")
             else:
-                return Response("Current user cannot remove the issue (missing rights)")      
+                return Response("Current user cannot remove the issue (missing permission level 1)")      
         return Response("Wrong issue id (incomplete or inexistent)")           
 issue_detail_view = IssueDetailAPIView.as_view()
 
@@ -369,6 +375,9 @@ class CommentListCreateAPIView(generics.ListCreateAPIView):
             print(contributor.contributor)
             # print(serializer.data)
             contriblist.append(str(contributor.contributor.email))
+            if str(contributor.contributor.id) == str(self.request.user.id):
+                 if str(contributor.permission) == "2":
+                    raise NotFound("Contributor has permission level 2 therefore he is not allowed to comment on issues of this project")
         if str(self.request.user.email) not in contriblist:
             raise NotFound({f"User {self.request.user.email}":" is not a contributor of this project"})
         serializer.validated_data['issue']= issue_id
@@ -439,7 +448,10 @@ class CommentDetailAPIView(APIView):
         project_pk = self.kwargs['pk_project']
         issue_pk = self.kwargs['pk_issue']
         comment_pk = self.kwargs['pk_comment']
-
+        # for contributor in Contributor.objects.filter(project_id=project_pk).order_by('id'):
+        #     if str(contributor.contributor.id) == str(self.request.user.id):
+        #          if str(contributor.permission) == "2":
+        #             raise NotFound("Contributor has permission level 2 therefore he is not allowed to comment on issues of this project")
         
         try:
             project = Project.objects.get(pk=project_pk)
