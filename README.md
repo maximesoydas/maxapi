@@ -1,6 +1,6 @@
 # MaxAPI readme
 
-### this app is an issue tracking system, where we can register, create projects and add users as contributors to our projects where they can create issues as well as comment on issues (as long as they are contributors of said project).
+### this app is an issue tracking system,we can register an account, create projects and add users as contributors to our projects where they can create issues as well as comment on issues (as long as they are contributors of said project).
 
 
 ## Configuration:
