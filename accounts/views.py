@@ -1,3 +1,4 @@
+from ast import Not
 from django.http import Http404
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -87,7 +88,7 @@ class ProjectDetailAPIView(APIView):
         try:
             return Project.objects.get(pk=pk)
         except Project.DoesNotExist:
-            raise Http404
+            raise NotFound({f"Project {pk}":"Not found"})
 
     def get(self, request, pk, format=None):
         try:
@@ -125,6 +126,7 @@ class ProjectDetailAPIView(APIView):
             return Response("User is not the author of this Project")
 
     def delete(self, request, pk, format=None):
+        
         project = self.get_object(pk)
         if project.author == self.request.user:
             project.delete()
@@ -145,8 +147,11 @@ class ContributorListCreateAPIView(generics.ListCreateAPIView):
         try:
             project_id = Project.objects.get(id=pk)
             for contributor in Contributor.objects.filter(project= pk):
-                if str(contributor.contributor.id) == str(serializer.validated_data['contributor']):
-                    raise ValidationError('Current user is already a contributor')
+                print(str(contributor.contributor.id))
+                print(str(serializer.validated_data['contributor']))
+                if str(contributor.contributor.id) == str(serializer.validated_data['contributor'].id):
+                    raise NotFound({f'User {pk} ': 'Current user is already a contributor'})
+                
             
             if project_id.author == self.request.user:
                 serializer.save(project = project_id)
