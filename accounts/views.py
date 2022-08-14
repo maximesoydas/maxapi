@@ -388,7 +388,7 @@ class CommentListCreateAPIView(generics.ListCreateAPIView):
             contriblist.append(str(contributor.contributor.email))
             
         if str(self.request.user.email) not in contriblist:
-            raise ValidationError("User is not a contributor of this project")
+            raise NotFound("User is not a contributor of this project")
         queryset = Comment.objects.filter(issue_id=issue).order_by('id')
         serializer = CommentSerializer(queryset, many=True)
             
