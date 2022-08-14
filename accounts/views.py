@@ -156,7 +156,7 @@ class ContributorListCreateAPIView(generics.ListCreateAPIView):
             if project_id.author == self.request.user:
                 serializer.save(project = project_id)
             else:
-                raise ValidationError('Current user is not the author of this project')
+                raise NotFound('Current user is not the author of this project')
         except Project.DoesNotExist:
             raise NotFound({f"Project {pk}": "Not Found"})
 
@@ -247,10 +247,10 @@ class IssueListCreateAPIView(generics.ListCreateAPIView):
                     return Response("Contributor has permission level 2 therefore he is not allowed to create issues on this project")
 
         if str(self.request.user.email) not in contriblist:
-            raise ValidationError("User is not a contributor of this project")
+            raise NotFound({"User":"Not a contributor of this project"})
         if str(serializer.validated_data['assignee']) not in contriblist:
             print('xzx')
-            raise ValidationError("Please set the assignee as a contributor before assigning issues")
+            raise NotFound({"Please set the assignee as a contributor before assigning issues"})
         serializer.validated_data['project']= project_id
         serializer.validated_data['author'] = self.request.user
         serializer.save()
@@ -364,7 +364,7 @@ class CommentListCreateAPIView(generics.ListCreateAPIView):
             # print(serializer.data)
             contriblist.append(str(contributor.contributor.email))
         if str(self.request.user.email) not in contriblist:
-            raise ValidationError("User is not a contributor of this project")
+            raise NotFound({f"User {self.request.user.email}":" is not a contributor of this project"})
         serializer.validated_data['issue']= issue_id
         serializer.validated_data['author'] = self.request.user
         serializer.save()
