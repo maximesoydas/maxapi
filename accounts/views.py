@@ -109,7 +109,10 @@ class ProjectDetailAPIView(APIView):
 
 
     def put(self, request, pk, format=None):
-        project = Project.objects.get(pk=pk)
+        try:
+            project = Project.objects.get(pk=pk)
+        except Project.DoesNotExist:
+            return Response(data={f"Project {pk} was not found"})
         data = self.request.data
         project.description = data["description"]
         project.title = data["title"]
