@@ -5,7 +5,7 @@
 
 ## Configuration:
 
-You will need two things before anything:
+You will need 3 things before anything:
 1. clone this github repository anywhere in your computer.
 1. [Postman Desktop Version](https://www.postman.com/downloads/)
 1. Then make sure to have [Python 3.x](https://www.python.org/downloads/) (any python above python 3)
