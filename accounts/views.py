@@ -142,19 +142,25 @@ class ContributorListCreateAPIView(generics.ListCreateAPIView):
     
     def perform_create(self, serializer):
         pk = self.kwargs['pk']
-        project_id = Project.objects.get(id=pk)
-        for contributor in Contributor.objects.filter(project= pk):
-            if str(contributor.contributor.id) == str(serializer.validated_data['contributor']):
-                raise ValidationError('Current user is already a contributor')
-         
-        if project_id.author == self.request.user:
-            serializer.save(project = project_id)
-        else:
-            raise ValidationError('Current user is not the author of this project')
+        try:
+            project_id = Project.objects.get(id=pk)
+            for contributor in Contributor.objects.filter(project= pk):
+                if str(contributor.contributor.id) == str(serializer.validated_data['contributor']):
+                    raise ValidationError('Current user is already a contributor')
+            
+            if project_id.author == self.request.user:
+                serializer.save(project = project_id)
+            else:
+                raise ValidationError('Current user is not the author of this project')
+        except Project.DoesNotExist:
+            raise NotFound({f"Project {pk}": "Not Found"})
 
 
     def list(self, request, pk):
-        project = Project.objects.get(id=pk)
+        try:
+            project = Project.objects.get(id=pk)
+        except Project.DoesNotExist:
+            return Response(data={f"Project {pk} was not found"})
         queryset = Contributor.objects.filter(project_id=pk).order_by('id')
         if project in Project.objects.filter(contributor__contributor=self.request.user):
             serializer = ContributorSerializer(queryset, many=True)
@@ -187,7 +193,7 @@ class ContributorDetailAPIView(APIView):
             contriblist.append(contributor.contributor.id)
         if user_id == project.author.id:
             # Maybe verify if the user is the author of project dont remove author from contributors
-            raise ValidationError("Project author cannot be removed from contributors") 
+            raise  NotFound({f"Project {project_id}": "Project author cannot be removed from contributors"}) 
         if user_id in contriblist:
             if self.request.user.id == user_id:
                 contributor.delete()
@@ -222,13 +228,18 @@ class IssueListCreateAPIView(generics.ListCreateAPIView):
     
     def perform_create(self, serializer):
         pk = self.kwargs['pk']
-        project_id = Project.objects.get(id=pk)
-        
+        try:
+            project_id = Project.objects.get(id=pk)
+        except Project.DoesNotExist:
+            raise NotFound({f"Project {pk}":"Project was not found"})
         print(serializer.validated_data['assignee'])
         contriblist=[]
         # if assignee is not in contributor return error
         for contributor in Contributor.objects.filter(project_id=project_id).order_by('id'):
             contriblist.append(str(contributor.contributor.email))
+            if contributor == self.request.user.email:
+                if contributor.permission == 2:
+                    return Response("Contributor has permission level 2 therefore he is not allowed to create issues on this project")
 
         if str(self.request.user.email) not in contriblist:
             raise ValidationError("User is not a contributor of this project")
@@ -272,7 +283,11 @@ class IssueDetailAPIView(APIView):
           
     def put(self, *args, **kwargs):
         pk = self.kwargs['pk_alt']
-        issue=Issue.objects.get(pk=pk)
+    
+        try:
+            issue = Issue.objects.get(id=pk)
+        except Issue.DoesNotExist:
+            raise NotFound({f"Issue {pk}": "Not Found"})
         print(issue)
         data = self.request.data
         
@@ -312,7 +327,7 @@ class IssueDetailAPIView(APIView):
                     if contributor.permission == 1:
                         
                         issue.delete()
-                        return Response(f"Issue {issue} removed from project by contributor {contributor.contributor} with permission")
+                        return Response(f"Issue {obj_id} : {issue} removed from project by contributor {contributor.contributor} with permission ")
             else:
                 return Response("Current user cannot remove the issue (missing rights)")      
         return Response("Wrong issue id (incomplete or inexistent)")           
@@ -355,10 +370,14 @@ class CommentListCreateAPIView(generics.ListCreateAPIView):
         
         project_pk = self.kwargs['pk']
         issue_pk = self.kwargs['pk_alt']
-        
-        project_id = Project.objects.get(id=project_pk)
-        issue = Issue.objects.get(id=issue_pk)
-        
+        try:
+            project_id = Project.objects.get(id=project_pk)
+        except Project.DoesNotExist:
+            raise NotFound({f"Project {project_pk}": "Not Found"})
+        try:
+            issue = Issue.objects.get(id=issue_pk)
+        except Issue.DoesNotExist:
+            raise NotFound({f"Issue {issue_pk}": "Not Found"})
         contriblist=[]
         for contributor in Contributor.objects.filter(project_id=project_id).order_by('id'):
             contriblist.append(str(contributor.contributor.email))
@@ -434,8 +453,10 @@ class CommentDetailAPIView(APIView):
 
     def delete(self, request, format=None,*args, **kwargs):
         comment_pk = self.kwargs['pk_comment']
-        comment=Comment.objects.get(pk=comment_pk)
-
+        try:
+            comment=Comment.objects.get(pk=comment_pk)
+        except Comment.DoesNotExist:
+          raise NotFound({f"Comment {comment_pk}": "Comment not found"})
         if comment.author == self.request.user:
             comment.delete()
             serializer = CommentSerializer(comment)
