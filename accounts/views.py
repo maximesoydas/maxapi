@@ -1,4 +1,5 @@
 from ast import Not
+from doctest import DocFileSuite
 from django.http import Http404
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -126,8 +127,10 @@ class ProjectDetailAPIView(APIView):
             return Response("User is not the author of this Project")
 
     def delete(self, request, pk, format=None):
-        
-        project = self.get_object(pk)
+        try:
+            project = self.get_object(pk)
+        except Project.DoesNotExist:
+            raise NotFound({f"Project {pk}":"Not found"})
         if project.author == self.request.user:
             project.delete()
             return Response(f"Project {pk} deleted")
@@ -150,7 +153,7 @@ class ContributorListCreateAPIView(generics.ListCreateAPIView):
                 print(str(contributor.contributor.id))
                 print(str(serializer.validated_data['contributor']))
                 if str(contributor.contributor.id) == str(serializer.validated_data['contributor'].id):
-                    raise NotFound({f'User {pk} ': 'Current user is already a contributor'})
+                    raise NotFound({f'Project {pk} ': 'Current user is already a contributor of this project'})
                 
             
             if project_id.author == self.request.user:
@@ -192,7 +195,10 @@ class ContributorDetailAPIView(APIView):
     def delete(self, request, format=None,*args, **kwargs):
         user_id = self.kwargs['pk_alt']
         project_id = self.kwargs['pk']
-        project = Project.objects.get(pk=project_id)
+        try:
+            project = Project.objects.get(pk=project_id)
+        except Project.DoesNotExist:
+            raise NotFound({f"Project {project_id}":"Not found"})
         contriblist = []
         for contributor in Contributor.objects.filter(project_id=project_id).order_by('id'):
             contriblist.append(contributor.contributor.id)
